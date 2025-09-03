@@ -1,30 +1,21 @@
-APSALIA ������
+APSALIA 📚🤖
 
 APSALIA est un utilitaire documentaire basé sur un système RAG (Retrieval-Augmented Generation).
 Il permet de charger, indexer et interroger des documents métier (RFI) grâce à Elasticsearch, des modèles d’embeddings, et une interface Streamlit.
 
 ✨ Fonctionnalités
 
-��� Consultation RAG : poser des questions et obtenir des réponses augmentées par vos documents.
+🔍 Consultation RAG : poser des questions et obtenir des réponses augmentées par vos documents.
+📂 Chargement & Indexation : importer vos fichiers Excel / Word / PDF pour enrichir la base documentaire.
+🛠 Utilitaire documentaire : explorer et tester vos documents.
+🔑 Authentification simple par mot de passe (clé API Mistral cachée côté serveur).
 
-��� Chargement & Indexation : importer vos fichiers Excel / Word / PDF pour enrichir la base documentaire.
-
-��� Utilitaire documentaire : explorer et tester vos documents.
-
-��� Authentification simple par mot de passe (clé API Mistral cachée côté serveur).
-
-��� Prérequis
-
-Docker
- & Docker Compose
-
-Un compte Mistral
- et une clé API valide
+🚀 Prérequis
+Docker & Docker Compose
+Un compte Mistral et une clé API valide
 
 ⚙️ Installation
-
 Cloner le dépôt :
-
 git clone https://github.com/DominiqueOstinet/APSALIA.git
 cd APSALIA
 
@@ -38,7 +29,7 @@ ELASTIC_PASSWORD=eqms123!
 MISTRAL_API_KEY=ta_clef_mistral_tres_longue
 
 # Mot de passe appli (pour les utilisateurs)
-APP_PASSWORD=apsalia (modifiable dans .env)
+APP_PASSWORD=apsalia
 
 
 Lancer Elasticsearch & l’application :
@@ -49,14 +40,13 @@ docker compose up -d app
 
 Indexer vos documents :
 Placez vos fichiers dans ./data/documents_xlsx/ puis lancez :
-
 docker compose run --rm indexer python /rag/indexing.py
 
 
 Accéder à l’interface :
-��� http://localhost:8502
+👉 http://localhost:8502
 
-���� Développement
+🧑‍💻 Développement
 
 Les fichiers Streamlit sont dans app/ et app/pages/
 La logique RAG et Elasticsearch est dans rag/
@@ -64,7 +54,7 @@ Pour modifier l’UI, éditez les fichiers app/pages/*.py puis cliquez sur Rerun
 Pour ajouter une dépendance Python → modifiez requirements.txt puis rebuild :
 docker compose build --no-cache app indexer
 
-��� Structure du projet
+📦 Structure du projet
 APSALIA/
 │
 ├── app/                  # Interface Streamlit
@@ -87,14 +77,14 @@ APSALIA/
 ├── requirements.txt
 └── README.md
 
-��� Sécurité
+🔐 Sécurité
 
 La clé Mistral API n’est jamais exposée aux utilisateurs.
 Les utilisateurs se connectent avec un mot de passe simple (APP_PASSWORD) pour activer le RAG.
 Ne poussez jamais votre .env dans Git.
 
-��� Roadmap (améliorations prévues)
+🛠 Roadmap (améliorations prévues)
 
- Amélioration de l’UI Streamlit (layout + design)
- Ajout de graphiques d’analyse documentaire
- Déploiement sur serveur / cloud
+🎨 Amélioration de l’UI Streamlit (layout + design)
+📊 Ajout de graphiques d’analyse documentaire
+🌐 Déploiement sur serveur / cloud
