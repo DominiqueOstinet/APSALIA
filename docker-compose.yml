@@ -1,0 +1,88 @@
+version: "3.9"
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.9
+    container_name: eqms-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - cluster.name=eqms-rag-cluster
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    ports:
+      - "9201:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+      - elasticsearch_logs:/usr/share/elasticsearch/logs
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "-u", "elastic:${ELASTIC_PASSWORD}", "http://localhost:9200"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks: [eqms-network]
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eqms-app
+    command: streamlit run app/streamlit_app.py --server.port 8502 --server.address 0.0.0.0
+    ports:
+      - "8502:8502"   #  Streamlit accessible sur http://localhost:8502
+    volumes:
+      - ./app:/app
+      - ./rag:/rag
+      - ./data:/data
+      - huggingface_cache:/root/.cache/huggingface
+      - ./data:/data
+    environment:
+      - ELASTIC_HOST=http://elasticsearch:9200
+      - ELASTIC_USERNAME=elastic
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
+      - APP_PASSWORD=${APP_PASSWORD}
+      - PYTHONPATH=/app:/  
+      - DOCS_DIR=/data/documents_xlsx 
+
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks: [eqms-network]
+
+  indexer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eqms-indexer
+    command: python /rag/indexing.py
+    volumes:
+      - ./rag:/rag
+      - ./app:/app
+      - ./data:/data
+      - huggingface_cache:/root/.cache/huggingface
+    environment:
+      - ELASTIC_HOST=http://elasticsearch:9200
+      - ELASTIC_USERNAME=elastic
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
+      - APP_PASSWORD=${APP_PASSWORD}
+      - PYTHONPATH=/app:/
+      - DOCS_DIR=/data/documents_xlsx 
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks: [eqms-network]
+
+volumes:
+  elasticsearch_data:
+  elasticsearch_logs:
+  huggingface_cache:
+
+networks:
+  eqms-network:
+    driver: bridge
+

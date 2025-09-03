@@ -1,0 +1,32 @@
+# ==== Core ML/AI ====
+torch>=2.2,<3
+sentence-transformers>=2.6,<3
+transformers>=4.40,<5
+
+# ==== LangChain ====
+langchain>=0.1,<0.2
+langchain-community>=0.0.20,<0.1
+langchain-mistralai>=0.1,<0.2
+
+# ==== Data processing ====
+pandas>=2.0,<3
+numpy>=1.24,<3
+openpyxl>=3.1,<4
+xlrd>=2.0,<3          # (lit .xls; pour .xlsx c'est openpyxl)
+python-docx>=1.0,<2
+pypdf>=4.0,<5         # de préférence à PyPDF2
+
+# ==== Elasticsearch 7.x ====
+elasticsearch>=7.17.9,<8.0.0
+urllib3>=1.26,<2.0    #  indispensable pour compat ES 7.x
+
+# ==== Web interface ====
+streamlit>=1.28,<2
+
+# ==== HTTP & utils ====
+requests>=2.31,<3
+python-dotenv>=1.0,<2
+
+
+
+

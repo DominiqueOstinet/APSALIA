@@ -1,0 +1,145 @@
+name: apsalia
+services:
+  app:
+    build:
+      context: C:\Users\d.ostinet\Documents\Apsalia
+      dockerfile: Dockerfile
+    command:
+      - streamlit
+      - run
+      - app/streamlit_app.py
+      - --server.port
+      - "8502"
+      - --server.address
+      - 0.0.0.0
+    container_name: eqms-app
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+        required: true
+    environment:
+      DOCS_DIR: /data/documents_xlsx
+      ELASTIC_HOST: http://elasticsearch:9200
+      ELASTIC_PASSWORD: eqms123!
+      ELASTIC_USERNAME: elastic
+      PYTHONPATH: /app:/
+    networks:
+      eqms-network: null
+    ports:
+      - mode: ingress
+        target: 8502
+        published: "8502"
+        protocol: tcp
+    volumes:
+      - type: bind
+        source: C:\Users\d.ostinet\Documents\Apsalia\app
+        target: /app
+        bind:
+          create_host_path: true
+      - type: bind
+        source: C:\Users\d.ostinet\Documents\Apsalia\rag
+        target: /rag
+        bind:
+          create_host_path: true
+      - type: bind
+        source: C:\Users\d.ostinet\Documents\Apsalia\data
+        target: /data
+        bind:
+          create_host_path: true
+      - type: volume
+        source: huggingface_cache
+        target: /root/.cache/huggingface
+        volume: {}
+  elasticsearch:
+    container_name: eqms-elasticsearch
+    environment:
+      ELASTIC_PASSWORD: eqms123!
+      ES_JAVA_OPTS: -Xms1g -Xmx1g
+      cluster.name: eqms-rag-cluster
+      discovery.type: single-node
+      xpack.security.enabled: "true"
+      xpack.security.http.ssl.enabled: "false"
+      xpack.security.transport.ssl.enabled: "false"
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -sf
+        - -u
+        - elastic:eqms123!
+        - http://localhost:9200
+      timeout: 5s
+      interval: 10s
+      retries: 30
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.9
+    networks:
+      eqms-network: null
+    ports:
+      - mode: ingress
+        target: 9200
+        published: "9201"
+        protocol: tcp
+      - mode: ingress
+        target: 9300
+        published: "9300"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: elasticsearch_data
+        target: /usr/share/elasticsearch/data
+        volume: {}
+      - type: volume
+        source: elasticsearch_logs
+        target: /usr/share/elasticsearch/logs
+        volume: {}
+  indexer:
+    build:
+      context: C:\Users\d.ostinet\Documents\Apsalia
+      dockerfile: Dockerfile
+    command:
+      - python
+      - /rag/indexing.py
+    container_name: eqms-indexer
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+        required: true
+    environment:
+      DOCS_DIR: /data/documents_xlsx
+      ELASTIC_HOST: http://elasticsearch:9200
+      ELASTIC_PASSWORD: eqms123!
+      ELASTIC_USERNAME: elastic
+      PYTHONPATH: /app:/
+    networks:
+      eqms-network: null
+    volumes:
+      - type: bind
+        source: C:\Users\d.ostinet\Documents\Apsalia\rag
+        target: /rag
+        bind:
+          create_host_path: true
+      - type: bind
+        source: C:\Users\d.ostinet\Documents\Apsalia\app
+        target: /app
+        bind:
+          create_host_path: true
+      - type: bind
+        source: C:\Users\d.ostinet\Documents\Apsalia\data
+        target: /data
+        bind:
+          create_host_path: true
+      - type: volume
+        source: huggingface_cache
+        target: /root/.cache/huggingface
+        volume: {}
+networks:
+  eqms-network:
+    name: apsalia_eqms-network
+    driver: bridge
+volumes:
+  elasticsearch_data:
+    name: apsalia_elasticsearch_data
+  elasticsearch_logs:
+    name: apsalia_elasticsearch_logs
+  huggingface_cache:
+    name: apsalia_huggingface_cache
