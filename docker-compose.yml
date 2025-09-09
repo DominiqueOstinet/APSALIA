@@ -38,15 +38,16 @@ services:
       - ./rag:/rag
       - ./data:/data
       - huggingface_cache:/root/.cache/huggingface
-      - ./data:/data
+      
     environment:
       - ELASTIC_HOST=http://elasticsearch:9200
       - ELASTIC_USERNAME=elastic
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
       - MISTRAL_API_KEY=${MISTRAL_API_KEY}
       - APP_PASSWORD=${APP_PASSWORD}
-      - PYTHONPATH=/app:/  
+      - PYTHONPATH=/app:/rag  
       - DOCS_DIR=/data/documents_xlsx 
+      - SOURCE_STORE_DIR=${SOURCE_STORE_DIR}
 
     depends_on:
       elasticsearch:
@@ -72,6 +73,8 @@ services:
       - APP_PASSWORD=${APP_PASSWORD}
       - PYTHONPATH=/app:/
       - DOCS_DIR=/data/documents_xlsx 
+      
+      
     depends_on:
       elasticsearch:
         condition: service_healthy

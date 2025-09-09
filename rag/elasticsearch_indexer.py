@@ -91,6 +91,9 @@ def create_index_if_not_exists(es: Elasticsearch, index_name: str) -> bool:
                 "end_row": {"type": "integer"},
                 "chunk_type": {"type": "keyword"},
                 "has_content": {"type": "boolean"},
+                "source_basename": {"type": "keyword"},
+                "source_sha256":   {"type": "keyword"},
+                "source_relpath":  {"type": "keyword"},
                 
                 # Métadonnées métier
                 "client_name": {"type": "keyword"},
