@@ -16,3 +16,5 @@ huggingface_cache/
 
 # Secrets
 .env
+
+compose.resolved.yml

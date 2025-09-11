@@ -186,19 +186,19 @@ RÉPONSE:""")
             print(f"{i}. {source['file']} - {source['sheet']} (lignes {source['lines']}){chunk_type_indicator}")
         print("="*80)
 
-    def display_result_with_top3(self, result: Dict[str, Any]):
-        """Affichage avec TOP 3 des meilleures réponses """
+    def display_result_with_top5(self, result: Dict[str, Any]):
+        """Affichage avec TOP 5 des meilleures réponses """
         print("\n" + "="*80)
         print("💡 RÉPONSE:")
         print("="*80)
         print(result["answer"])
 
-        # TOP 3 - Texte exact des meilleures réponses
-        print(f"\n📋 TOP 3 - TEXTE EXACT DES MEILLEURES RÉPONSES:")
+        # TOP 5 - Texte exact des meilleures réponses
+        print(f"\n📋 TOP 5 - TEXTE EXACT DES MEILLEURES RÉPONSES:")
         print("="*80)
 
-        top_3_docs = result["source_documents"][:3]
-        for i, doc in enumerate(top_3_docs, 1):
+        top_5_docs = result["source_documents"][:5]
+        for i, doc in enumerate(top_5_docs, 1):
             metadata = doc.get("metadata", {})
             source_info = f"{Path(metadata.get('source', 'Unknown')).stem} - {metadata.get('sheet_name', 'Unknown')}"
             lines_info = f"Lignes {metadata.get('start_row', '?')}-{metadata.get('end_row', '?')}"
@@ -208,7 +208,7 @@ RÉPONSE:""")
             print("-" * 60)
             print(doc.get('content', ''))
 
-            if i < len(top_3_docs):
+            if i < len(top_5_docs):
                 print("\n" + "."*60)
 
         # Toutes les sources
@@ -216,6 +216,6 @@ RÉPONSE:""")
         print("-"*60)
         for i, source in enumerate(result['sources_info'], 1):
             chunk_type_indicator = " [MÉTIER]" if source.get('chunk_type') == 'smart_business' else " [GÉNÉRIQUE]"
-            star = "⭐" if i <= 3 else "  "
+            star = "⭐" if i <= 5 else "  "
             print(f"{star}{i}. {source['file']} - {source['sheet']} (lignes {source['lines']}){chunk_type_indicator}")
         print("="*80)

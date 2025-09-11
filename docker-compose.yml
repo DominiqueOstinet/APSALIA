@@ -1,4 +1,4 @@
-version: "3.9"
+
 
 services:
   elasticsearch:
@@ -45,7 +45,7 @@ services:
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
       - MISTRAL_API_KEY=${MISTRAL_API_KEY}
       - APP_PASSWORD=${APP_PASSWORD}
-      - PYTHONPATH=/app:/rag  
+      - PYTHONPATH=/:/app  
       - DOCS_DIR=/data/documents_xlsx 
       - SOURCE_STORE_DIR=${SOURCE_STORE_DIR}
 
@@ -71,8 +71,9 @@ services:
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
       - MISTRAL_API_KEY=${MISTRAL_API_KEY}
       - APP_PASSWORD=${APP_PASSWORD}
-      - PYTHONPATH=/app:/
+      - PYTHONPATH=/:/app
       - DOCS_DIR=/data/documents_xlsx 
+      - SOURCE_STORE_DIR=${SOURCE_STORE_DIR} 
       
       
     depends_on:
