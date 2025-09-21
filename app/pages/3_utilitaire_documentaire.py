@@ -2,6 +2,13 @@
 import streamlit as st
 from app.utils_docs import extract_document_content, DOCX_AVAILABLE, PDF_AVAILABLE
 
+from utils_docs import hide_native_nav, custom_sidebar_nav, sidebar_system_status, require_login
+
+hide_native_nav()
+custom_sidebar_nav(active="Consultation RAG")  # ou la page courante
+sidebar_system_status()
+require_login()  # ⬅️ empêche l'accès si non connecté
+
 st.set_page_config(page_title="Utilitaire documentaire", page_icon="📄", layout="wide")
 st.header("📄 Utilitaire Documentaire")
 st.markdown("*Interface pour traiter vos documents sans conservation des données*")
@@ -84,12 +91,15 @@ if op == "Traduction automatique":
 # ───────── Résumé ─────────
 elif op == "Résumé de document":
     st.subheader("📋 Résumé de Document")
-    c1, c2 = st.columns(2)
-    with c1:
-        length = st.selectbox("Longueur du résumé:", ["Court (1-2 paragraphes)", "Moyen (3-5 paragraphes)", "Détaillé (6+ paragraphes)"])
-    with c2:
-        focus = st.selectbox("Focus:", ["Points principaux", "Aspects techniques", "Décisions importantes", "Actions requises"])
-    doc_name = st.selectbox("Document à résumer:", [f.name for f in supported])
+
+    # Choix de la longueur uniquement
+    length = st.selectbox(
+        "Longueur du résumé :",
+        ["Court (1-2 paragraphes)", "Moyen (3-5 paragraphes)", "Détaillé (6+ paragraphes)"]
+    )
+
+    # Choix du document
+    doc_name = st.selectbox("Document à résumer :", [f.name for f in supported])
 
     if st.button("📝 Générer le résumé"):
         sel = next(f for f in supported if f.name == doc_name)
@@ -101,11 +111,19 @@ elif op == "Résumé de document":
                 limit = 6000
                 if len(content) > limit:
                     content = content[:limit] + "...\n[Contenu tronqué]"
-                prompt = f"Fais un résumé {length.lower()} en te concentrant sur {focus.lower()}.\n\nDocument :\n{content}\n\nRésumé :"
+
+                # Nouveau prompt sans notion de "focus"
+                prompt = f"Fais un résumé {length.lower()} du document suivant :\n\n{content}\n\nRésumé :"
+
                 out = st.session_state.rag_system.llm.invoke(prompt)
                 st.success("✅ Résumé généré")
                 st.markdown(out.content)
-                st.download_button("📥 Télécharger", data=out.content, file_name=f"{doc_name}_resume.md", mime="text/markdown")
+                st.download_button(
+                    "📥 Télécharger",
+                    data=out.content,
+                    file_name=f"{doc_name}_resume.md",
+                    mime="text/markdown"
+                )
 
 # ───────── Comparaison ─────────
 else:
@@ -114,45 +132,146 @@ else:
         st.warning("⚠️ Charge au moins 2 documents supportés pour comparer.")
         st.stop()
 
-    c1, c2 = st.columns(2)
-    with c1:
-        older = st.selectbox("Document version 1 (ancienne):", [f.name for f in supported], key="doc1")
-    with c2:
-        newer = st.selectbox("Document version 2 (nouvelle):", [f.name for f in supported], key="doc2")
+    c1_col, c2_col = st.columns(2)
+    with c1_col:
+        older = st.selectbox("Document version 1 (ancienne) :", [f.name for f in supported], key="doc1")
+    with c2_col:
+        newer = st.selectbox("Document version 2 (nouvelle) :", [f.name for f in supported], key="doc2")
 
-    comp_type = st.selectbox("Type de comparaison:", ["Modifications principales", "Ajouts et suppressions", "Changements techniques", "Analyse complète"])
-
-    if older != newer and st.button("🔄 Comparer les versions"):
+    if older == newer:
+        st.error("⚠️ Sélectionne deux documents différents.")
+    elif st.button("🔄 Comparer les versions"):
         d1 = next(f for f in supported if f.name == older)
         d2 = next(f for f in supported if f.name == newer)
+
+        import re, difflib
+        from typing import List, Tuple
+
+        def split_units(txt: str) -> List[str]:
+            """Découpe le texte en unités lisibles (phrases / puces / lignes)."""
+            t = re.sub(r"[•\-\u2022]\s*", "\n", txt)  # puces → retours ligne
+            parts = re.split(r"(?<=[\.\!\?])\s+|\n+", t)  # fin de phrase OU newline
+            return [p.strip() for p in parts if p and p.strip()]
+
+        def word_diff(a: str, b: str) -> str:
+            """Diff mot-à-mot : '2021 → 1999, haut → très haut, …'"""
+            a_w, b_w = a.split(), b.split()
+            diff = list(difflib.ndiff(a_w, b_w))
+            changes, i = [], 0
+            while i < len(diff):
+                if diff[i].startswith("- ") and i+1 < len(diff) and diff[i+1].startswith("+ "):
+                    changes.append(f"{diff[i][2:]} → {diff[i+1][2:]}")
+                    i += 2
+                elif diff[i].startswith("- "):
+                    changes.append(f"supprimé: {diff[i][2:]}")
+                    i += 1
+                elif diff[i].startswith("+ "):
+                    changes.append(f"ajouté: {diff[i][2:]}")
+                    i += 1
+                else:
+                    i += 1
+            return ", ".join(changes)
+
         with st.spinner("Comparaison en cours..."):
-            c1 = extract_document_content(d1)
-            c2 = extract_document_content(d2)
-            if c1.startswith("[Erreur") or c2.startswith("[Erreur"):
-                st.error("Erreur extraction d'un des documents.")
+            text_old = extract_document_content(d1)
+            text_new = extract_document_content(d2)
+
+            if text_old.startswith("[Erreur") or text_new.startswith("[Erreur"):
+                st.error("Erreur d'extraction d'un des documents.")
+                st.stop()
+
+            # Tronquage sécurité
+            limit = 20000
+            if len(text_old) > limit: text_old = text_old[:limit]
+            if len(text_new) > limit: text_new = text_new[:limit]
+
+            old_units = split_units(text_old)
+            new_units = split_units(text_new)
+
+            # Aligne les unités (phrases/lignes) entre anciennes et nouvelles versions
+            sm = difflib.SequenceMatcher(None, old_units, new_units)
+            added: List[str] = []
+            removed: List[str] = []
+            modified: List[Tuple[str, str, str]] = []  # (ancien, nouveau, diff)
+
+            for tag, i1, i2, j1, j2 in sm.get_opcodes():
+                if tag == "equal":
+                    continue
+                elif tag == "delete":
+                    removed.extend(old_units[i1:i2])
+                elif tag == "insert":
+                    added.extend(new_units[j1:j2])
+                elif tag == "replace":
+                    # On associe les paires dans la zone remplacée
+                    a_block = old_units[i1:i2]
+                    b_block = new_units[j1:j2]
+                    n = min(len(a_block), len(b_block))
+                    for k in range(n):
+                        a_sent, b_sent = a_block[k], b_block[k]
+                        diff_words = word_diff(a_sent, b_sent)
+                        if a_sent != b_sent:
+                            modified.append((a_sent, b_sent, diff_words))
+                    # S'il reste des lignes en plus d'un côté, ce sont des ajouts/suppressions purs
+                    if len(a_block) > n:
+                        removed.extend(a_block[n:])
+                    if len(b_block) > n:
+                        added.extend(b_block[n:])
+
+            # ----- Rendu -----
+            st.success("✅ Comparaison terminée")
+            st.subheader(f"Comparaison : {older} → {newer}")
+
+            st.markdown("### Éléments ajoutés")
+            if added:
+                for u in added:
+                    st.markdown(f"- {u}")
             else:
-                limit = 3000
-                if len(c1) > limit: c1 = c1[:limit] + "...\n[Contenu tronqué]"
-                if len(c2) > limit: c2 = c2[:limit] + "...\n[Contenu tronqué]"
-                prompt = f"""Compare ces deux versions et identifie les {comp_type.lower()}.
+                st.markdown("_Aucun_")
 
-VERSION 1 ({older}) :
-{c1}
+            st.markdown("### Éléments supprimés")
+            if removed:
+                for u in removed:
+                    st.markdown(f"- {u}")
+            else:
+                st.markdown("_Aucun_")
 
-VERSION 2 ({newer}) :
-{c2}
+            st.markdown("### Éléments modifiés")
+            if modified:
+                for old_s, new_s, d in modified:
+                    st.markdown(f"- **Ancienne :** {old_s}\n  **Nouvelle :** {new_s}\n  ↳ **Différences :** {d if d else 'modifications mineures'}")
+            else:
+                st.markdown("_Aucun_")
 
-Analyse comparative détaillée :
-1. Modifications principales
-2. Éléments ajoutés
-3. Éléments supprimés
-4. Impact des changements
+            # ----- Export Markdown -----
+            md_lines = []
+            md_lines.append(f"# Comparaison : {older} → {newer}")
+            md_lines.append("")
+            md_lines.append("## Éléments ajoutés")
+            if added:
+                md_lines.extend([f"- {u}" for u in added])
+            else:
+                md_lines.append("_Aucun_")
+            md_lines.append("")
+            md_lines.append("## Éléments supprimés")
+            if removed:
+                md_lines.extend([f"- {u}" for u in removed])
+            else:
+                md_lines.append("_Aucun_")
+            md_lines.append("")
+            md_lines.append("## Éléments modifiés")
+            if modified:
+                for old_s, new_s, d in modified:
+                    md_lines.append(f"- **Ancienne :** {old_s}")
+                    md_lines.append(f"  **Nouvelle :** {new_s}")
+                    md_lines.append(f"  ↳ **Différences :** {d if d else 'modifications mineures'}")
+            else:
+                md_lines.append("_Aucun_")
+            md_lines.append("")
 
-Comparaison :"""
-                out = st.session_state.rag_system.llm.invoke(prompt)
-                st.success("✅ Comparaison terminée")
-                st.subheader(f"Comparaison : {older} → {newer}")
-                st.markdown(out.content)
-                st.download_button("📥 Télécharger", data=out.content, file_name=f"Comparaison_{older}_vs_{newer}.md", mime="text/markdown")
-    elif older == newer:
-        st.error("⚠️ Sélectionne deux documents différents.")
+            md_text = "\n".join(md_lines)
+            st.download_button(
+                "📥 Télécharger",
+                data=md_text,
+                file_name=f"Comparaison_{older}_vs_{newer}.md",
+                mime="text/markdown"
+            )

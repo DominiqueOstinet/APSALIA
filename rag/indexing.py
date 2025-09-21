@@ -16,11 +16,11 @@ from rag.elasticsearch_indexer import (
 # indexing.py est placé dans /rag (racine du code dans le conteneur)
 # et docker-compose monte ./data -> /rag/data
 BASE_DIR = Path(__file__).resolve().parent           # /rag
-DOCS_DIR = Path(os.getenv("DOCS_DIR", str(BASE_DIR / "data" / "documents_xlsx")))
+DOCS_DIR = Path(os.getenv("DOCS_DIR", "/data/documents_xlsx"))
 INDEX_NAME = os.getenv("ELASTICSEARCH_INDEX", "rfi_rag")
 
 # Où copier les fichiers sources pour téléchargement ultérieur
-SOURCE_STORE_DIR = Path(os.getenv("SOURCE_STORE_DIR", str(BASE_DIR / "data" / "source_store")))
+SOURCE_STORE_DIR = Path(os.getenv("SOURCE_STORE_DIR", "/data/source_store"))
 
 # Contrôle de la suppression de l'index (par défaut: False)
 REINDEX_DROP = os.getenv("REINDEX_DROP", "false").lower() in {"1", "true", "yes", "y"}

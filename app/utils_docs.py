@@ -2,6 +2,7 @@
 import os
 import io
 import tempfile
+import streamlit as st
 
 try:
     from docx import Document
@@ -69,3 +70,82 @@ def extract_document_content(uploaded_file) -> str:
         file_content = f"[Erreur générale pour {uploaded_file.name}: {e}]"
 
     return file_content
+
+INDEX_NAME = os.getenv("ELASTICSEARCH_INDEX", "rfi_rag")
+
+def hide_native_nav():
+    """Masque la navigation native de Streamlit (liste des pages)."""
+    st.markdown("""
+    <style>
+    /* cache les différentes variantes du menu natif */
+    section[data-testid="stSidebar"] [data-testid="stSidebarNav"] { display: none !important; }
+    section[data-testid="stSidebar"] nav[aria-label="Pages"]     { display: none !important; }
+    /* style sidebar (léger) */
+    section[data-testid="stSidebar"] { background: #f3f9ff; }
+    .tiny-status { font-size: 12px; line-height: 1.15; color:#334155; }
+    .badge-ok    { background:#e6f6ee; border:1px solid #bfead4; padding:0 6px; border-radius:12px; }
+    .badge-warn  { background:#fff6e6; border:1px solid #ffe2ad; padding:0 6px; border-radius:12px; }
+    </style>
+    """, unsafe_allow_html=True)
+
+def custom_sidebar_nav(active: str | None = None):
+    """
+    Menu déroulant custom dans la sidebar.
+    active : le libellé de la page courante pour présélectionner l'option.
+    """
+    PAGE_MAP = {
+        "Accueil": "streamlit_app.py",
+        "Consultation RAG": "pages/1_consultation_RAG.py",
+        "Chargement & Indexation": "pages/2_chargement_Documents.py",
+        "Utilitaire documentaire": "pages/3_utilitaire_documentaire.py",
+    }
+    labels = list(PAGE_MAP.keys())
+    default_index = labels.index(active) if active in labels else 0
+    with st.sidebar:
+        st.markdown("**Choisir une section**")
+        choice = st.selectbox("", labels, index=default_index, key="nav_select")
+        if st.button("Ouvrir", use_container_width=True, key="nav_open"):
+            st.switch_page(PAGE_MAP[choice])
+
+def sidebar_system_status():
+    """Petit encart 'Statut système' en bas de la sidebar (très discret)."""
+    from rag.elasticsearch_indexer import get_index_stats, get_elastic_client  # import local
+    with st.sidebar:
+        st.markdown("---")
+        st.caption("🧩 Statut système")
+        # Récup stats, compatible 2 signatures possibles
+        docs, size_kb, ok = "—", "—", False
+        try:
+            try:
+                stats = get_index_stats()  # signature sans arg
+                docs = stats.get("docs_count", "—")
+                size_kb = round(stats.get("store_size_kb", 0), 1)
+                ok = True
+            except TypeError:
+                es = get_elastic_client()
+                stats = get_index_stats(es, INDEX_NAME)  # signature (client, index)
+                if "error" not in stats:
+                    docs = stats.get("documents_count", "—")
+                    size_kb = round(stats.get("store_size_bytes", 0) / 1024, 1)
+                    ok = True
+        except Exception:
+            ok = False
+        st.markdown(
+            f"""<div class="tiny-status">
+            ES : <span class='{"badge-ok" if ok else "badge-warn"}'>{"OK" if ok else "HS"}</span><br>
+            Docs : <b>{docs}</b><br>
+            Taille (KB) : <b>{size_kb}</b>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+
+
+def require_login():
+    """
+    Bloque l'accès si l'utilisateur n'est pas connecté via mot de passe.
+    Affiche un lien pour revenir à l'Accueil et se connecter.
+    """
+    if not st.session_state.get("is_auth"):
+        st.warning("🔒 Veuillez vous connecter sur la page Accueil.")
+        st.page_link("streamlit_app.py", label="➡️ Retour à l’Accueil pour se connecter")
+        st.stop()
