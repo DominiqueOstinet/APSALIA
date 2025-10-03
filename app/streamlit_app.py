@@ -6,13 +6,15 @@ from rag.elasticsearch_indexer import get_elastic_client, get_index_stats
 from rag.rag_system import EQMSRAGSystem
 from utils_docs import hide_native_nav, custom_sidebar_nav, sidebar_system_status
 
+# --- Page config ---
+st.set_page_config(page_title="ApsalIA", page_icon="assets/image_apsalia.png", layout="wide")
+
 # --- Nav & statut (menu uniquement dans le bandeau de gauche) ---
 hide_native_nav()
 custom_sidebar_nav(active="Accueil")     # <— Accueil (et plus “Consultation RAG”)
 sidebar_system_status()
 
-# --- Page config ---
-st.set_page_config(page_title="ApsalIA", page_icon="assets/image_apsalia.png", layout="wide")
+
 
 # --- CSS : fond bleu, carte centrée, header caché, boutons, etc. ---
 st.markdown(
@@ -86,26 +88,43 @@ if "is_auth" not in st.session_state:
     st.session_state.is_auth = False
 
 # --- Layout principal : gauche (logo + description), droite (connexion) ---
-col_left, col_right = st.columns([2,1], gap="large")
+col_left, col_right = st.columns([1,2], gap="large")
 
-# ---- Colonne GAUCHE : Logo + bloc de texte descriptif (pas de titre) ----
-with col_left:
+# ---- Colonne DROITE : Logo + bloc de texte descriptif (pas de titre) ----
+with col_right:
     img_path = Path(__file__).parent / "assets" / "image_apsalia.png"
     st.image(str(img_path), width=520)  # logo large
 
     st.markdown(
-        """
-        <div class="desc-card">
-          <p><b>🔍 Consultation RFI/RFP</b> — Posez vos questions, obtenez des réponses sourcées.</p>
-          <p><b>📁 Chargement & Indexation</b> — Déposez de nouveaux RFI/RFP documents, choisissez des mots-clés, indexation automatique.</p>
-          <p><b>📄 Utilitaire documentaire</b> — Traduire, résumer, comparer deux documents.</p>
-        </div>
-        """,
+    """
+    <style>
+      .desc-card{padding:14px 16px;border:1px solid #e6e6e6;border-radius:12px;margin-bottom:14px;background:#fff}
+      .desc-card h3{margin:0 0 8px 0;font-size:1.05rem}
+      .desc-card ul{margin:0 0 0 18px}
+      .desc-card li{margin:6px 0}
+    </style>
+
+    <div class="desc-card">
+      <h3>Utilitaires MasterControl</h3>
+      <ul>
+        <li><b>🔍 Consultation RFI/RFP</b> — Posez vos questions, obtenez des réponses sourcées.</li>
+        <li><b>📁 Chargement & Indexation</b> — Déposez de nouveaux RFI/RFP, indexation automatique.</li>
+        <li><b>📊 Analyse utilisateurs</b> — Clustering K-Means par application (méthode du coude), heatmap des profils et analyse des fréquences d'utilisation.</li>
+      </ul>
+    </div>
+
+    <div class="desc-card">
+      <h3>🛠️ Outils documentaires</h3>
+      <ul>
+        <li><b>📄 Utilitaire documentaire</b> — Traduire, résumer, comparer deux documents.</li>
+      </ul>
+    </div>
+    """,
         unsafe_allow_html=True
     )
 
-# ---- Colonne DROITE : Connexion (mot de passe uniquement + spinner) ----
-with col_right:
+# ---- Colonne GAUCHE : Connexion (mot de passe uniquement + spinner) ----
+with col_left:
     APP_PASSWORD = os.getenv("APP_PASSWORD", "")
     MISTRAL_API_KEY_ENV = os.getenv("MISTRAL_API_KEY", "")
 

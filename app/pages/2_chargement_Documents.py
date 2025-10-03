@@ -26,7 +26,13 @@ from rag.elasticsearch_indexer import (
     create_index_if_not_exists,
     index_documents_bulk,
 )
-from rag.doc_loader import detect_columns, create_smart_chunks_from_detected
+from rag.doc_loader import detect_columns, create_smart_chunks_from_detected,KEYWORDS_BESOIN, KEYWORDS_REPONSE
+
+# éviter les KeyError au premier affichage
+if "custom_keywords_besoin" not in st.session_state:
+    st.session_state.custom_keywords_besoin = []
+if "custom_keywords_reponse" not in st.session_state:
+    st.session_state.custom_keywords_reponse = []
 
 from rag.embeddings import get_embedding_model      
 
@@ -94,29 +100,41 @@ def _copy_native_and_get_meta(tmp_path: Path, original_name: str) -> tuple[Path,
 
 def _enrich_chunks_with_source_metadata(chunks: List, basename: str, sha: str, relpath: str) -> None:
     """
-    Ajoute aux chunks la traçabilité source (alignée avec indexing.py) :
-    - source_basename
-    - source_sha256
-    - source_relpath
+    Traçabilité source alignée avec indexing.py :
+    - source_basename / source_sha256 / source_relpath
+    - content_sha256  : hash du contenu du chunk
+    - obsolete        : False par défaut
     """
+    import hashlib
+
     for doc in chunks:
         md = getattr(doc, "metadata", None)
         if md is None:
             setattr(doc, "metadata", {})
             md = doc.metadata
-        md.update(
-            {
-                "source_basename": basename,
-                "source_sha256": sha,
-                "source_relpath": relpath,
-            }
-        )
 
+        try:
+            content_sha = hashlib.sha256(
+                (doc.page_content or "").encode("utf-8", errors="ignore")
+            ).hexdigest()
+        except Exception:
+            content_sha = None
+
+        md.update({
+            "source_basename": basename,
+            "source_sha256": sha,
+            "source_relpath": relpath,
+            "content_sha256": content_sha,
+            "obsolete": False,
+        })
 
 # ────────────────────────────────────────────────────────────────────────────────
 # Upload UI
 # ────────────────────────────────────────────────────────────────────────────────
-uploaded_files = st.file_uploader(
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    uploaded_files = st.file_uploader(
     "Déposez un ou plusieurs fichiers Excel",
     type=["xlsx", "xls"],
     accept_multiple_files=True,
@@ -125,6 +143,49 @@ uploaded_files = st.file_uploader(
 if not uploaded_files:
     st.info("Glissez-déposez vos fichiers Excel ici (ou cliquez pour sélectionner).")
     st.stop()
+
+with col2:
+    st.subheader("Configuration des mots-clés")
+    # BESOIN
+with st.expander("🔍 Mots-clés BESOIN", expanded=False):
+    st.write("**Par défaut :**")
+    st.write(", ".join(KEYWORDS_BESOIN))
+    new_kw_besoin = st.text_input("Ajouter un mot-clé BESOIN:", key="new_besoin")
+    if st.button("Ajouter BESOIN", key="add_besoin"):
+        if new_kw_besoin and new_kw_besoin.lower() not in [k.lower() for k in KEYWORDS_BESOIN + st.session_state.get("custom_keywords_besoin", [])]:
+            st.session_state.custom_keywords_besoin = st.session_state.get("custom_keywords_besoin", []) + [new_kw_besoin.lower()]
+            st.success(f"Ajouté: {new_kw_besoin}")
+            st.rerun()
+    if st.session_state.get("custom_keywords_besoin"):
+        st.write("**Personnalisés :**")
+        for i, kw in enumerate(st.session_state.custom_keywords_besoin):
+            c1, c2 = st.columns([3, 1])
+            with c1: st.write(kw)
+            with c2:
+                if st.button("❌", key=f"del_besoin_{i}"):
+                    st.session_state.custom_keywords_besoin.remove(kw)
+                    st.rerun()
+
+# RÉPONSE
+with st.expander("💬 Mots-clés RÉPONSE", expanded=False):
+    st.write("**Par défaut :**")
+    st.write(", ".join(KEYWORDS_REPONSE))
+    new_kw_rep = st.text_input("Ajouter un mot-clé RÉPONSE:", key="new_reponse")
+    if st.button("Ajouter RÉPONSE", key="add_reponse"):
+        if new_kw_rep and new_kw_rep.lower() not in [k.lower() for k in KEYWORDS_REPONSE + st.session_state.get("custom_keywords_reponse", [])]:
+            st.session_state.custom_keywords_reponse = st.session_state.get("custom_keywords_reponse", []) + [new_kw_rep.lower()]
+            st.success(f"Ajouté: {new_kw_rep}")
+            st.rerun()
+    if st.session_state.get("custom_keywords_reponse"):
+        st.write("**Personnalisés :**")
+        for i, kw in enumerate(st.session_state.custom_keywords_reponse):
+            c1, c2 = st.columns([3, 1])
+            with c1: st.write(kw)
+            with c2:
+                if st.button("❌", key=f"del_reponse_{i}"):
+                    st.session_state.custom_keywords_reponse.remove(kw)
+                    st.rerun()
+
 
 # ────────────────────────────────────────────────────────────────────────────────
 # Traitement
@@ -171,10 +232,23 @@ if st.button("🚀 Lancer le chargement & l’indexation", type="primary"):
         file_chunks: List = []
 
         # 3) Détection des onglets (aligné sur indexing.py)
+
+        
         try:
             # on lit TOUTES les feuilles sans header ; la fonction de détection va trouver la ligne d’en-tête utile
             all_sheets = pd.read_excel(tmp_path, sheet_name=None, header=None)
-            onglets = detect_columns(all_sheets, uf.name)  # liste de dicts (onglet_data)
+
+            # combine défaut + personnalisés depuis l’UI
+            kw_besoin  = KEYWORDS_BESOIN  + st.session_state.get("custom_keywords_besoin", [])
+            kw_reponse = KEYWORDS_REPONSE + st.session_state.get("custom_keywords_reponse", [])
+
+            # passe les listes à la détection
+            onglets = detect_columns(
+                all_sheets,
+                uf.name,
+                keywords_besoin=kw_besoin,
+                keywords_reponse=kw_reponse,
+    )
         except Exception as e:
             errors += 1
             st.error(f"Erreur analyse Excel '{uf.name}' : {e}")

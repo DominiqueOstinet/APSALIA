@@ -46,16 +46,16 @@ TYPES DE DEMANDES CLIENTS À TRAITER:
 MÉTHODE DE RÉPONSE:
 1. ANALYSE d'abord si l'information existe dans les documents
 2. Si OUI:
-   - Confirme avec les références précises (identifiant + source)
    - Distingue BESOIN CLIENT vs SOLUTION PROPOSÉE
    - Cite les éléments factuels
 3. Si NON: "Cette fonctionnalité n'est pas documentée dans les besoins analysés"
 4. Si PARTIEL: Explique ce qui est couvert et ce qui manque
 
 FORMAT DE RÉPONSE:
-- Réponse directe à la demande (OUI/NON/PARTIELLEMENT)
-- Justification avec références précises
-- Citations des besoins/solutions pertinents
+- Réponse directe et concise.
+- Ne produis PAS de liste exhaustive issue des extraits.
+- Si plusieurs sources 'incdisent la même chose, synthétise.
+- N’inclus pas de section ‘Références’, ‘Sources’, ‘Élément X’ ou d’énumération d’extraits. L’interface affiche déjà les sources séparément.
 
 DOCUMENTS ANALYSÉS:
 {context}
@@ -102,13 +102,9 @@ RÉPONSE:""")
 
             formatted = []
             for i, doc in enumerate(docs, 1):
-                source_info = f"Source: {Path(doc.get('metadata', {}).get('source', 'Unknown')).stem}"
-                sheet_info = f"Section: {doc.get('metadata', {}).get('sheet_name', 'Unknown')}"
-                lines_info = f"Lignes {doc.get('metadata', {}).get('start_row', '?')}"
-                
-                content = doc.get('content', '')
-                
-                formatted.append(f"=== ÉLÉMENT {i} ===\n{source_info} - {sheet_info} ({lines_info})\n\n{content}")
+                #  uniquement le contenu, sans META
+                content = (doc.get('content', '') or '').split('--- MÉTADONNÉES ---')[0].strip()
+                formatted.append(content)
 
             return "\n\n" + "="*60 + "\n\n".join(formatted)
 
@@ -161,7 +157,9 @@ RÉPONSE:""")
                 "sheet": metadata.get('sheet_name', 'Unknown'),
                 "lines": f"{metadata.get('start_row', '?')}-{metadata.get('end_row', '?')}",
                 "has_content": metadata.get('has_content', False),
-                "chunk_type": metadata.get('chunk_type', 'unknown')
+                "chunk_type": metadata.get('chunk_type', 'unknown'),
+                "obsolete": metadata.get('obsolete', False),
+                "chunk_id": metadata.get('chunk_id')
             }
             sources_info.append(source_info)
 

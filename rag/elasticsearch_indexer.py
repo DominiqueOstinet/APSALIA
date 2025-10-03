@@ -83,6 +83,11 @@ def create_index_if_not_exists(es: Elasticsearch, index_name: str) -> bool:
                     "index": True,
                     "similarity": "cosine"
                 },
+
+                # Champs pour gestion d’obsolescence
+                "obsolete": {"type": "boolean"},           
+                "content_sha256": {"type": "keyword"}, 
+
                 # Métadonnées du document source
                 "source": {"type": "keyword"},
                 "sheet_name": {"type": "keyword"},
@@ -136,6 +141,7 @@ def index_documents_bulk(es: Elasticsearch, documents: List[Document], vectors: 
             '_source': {
                 'content': doc.page_content,
                 'embedding': vector,
+                'obsolete': bool(doc.metadata.get('obsolete', False)),
                 **doc.metadata,  # Toutes les métadonnées
                 'indexed_at': '2025-01-01T00:00:00Z',
                 'processing_version': 'docker-v1.0'
@@ -172,17 +178,22 @@ def search_documents(es: Elasticsearch, query_vector: List[float], index_name: s
         "size": size,
         "query": {
             "script_score": {
-                "query": {"match_all": {}},
+                "query": {
+                     "bool": {
+                        # Exclure  les obsolètes 
+                        "must_not": [{"term": {"obsolete": True}}]
+                }
+              },
                 "script": {
                     "source": "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
                     "params": {"query_vector": query_vector}
-                }
             }
-        },
-        "_source": {
-            "excludes": ["embedding"]  # Exclure le vecteur pour économiser la bande passante
         }
+    },
+        "_source": {
+            "excludes": ["embedding"]
     }
+}
     
     try:
         response = es.search(index=index_name, body=search_body)
@@ -220,3 +231,19 @@ def get_index_stats(es: Elasticsearch, index_name: str) -> Dict[str, Any]:
         }
     except Exception as e:
         return {"error": str(e)}
+    
+
+def set_chunk_obsolete(es: Elasticsearch, index_name: str, chunk_id: str, obsolete: bool = True) -> dict:
+    """
+    Marque (ou démarque) un chunk comme obsolète via son _id (= chunk_id).
+    """
+    try:
+        resp = es.update(
+            index=index_name,
+            id=chunk_id,
+            body={"doc": {"obsolete": bool(obsolete)}},
+            refresh=True
+        )
+        return resp
+    except Exception as e:
+        raise RuntimeError(f"Échec set_chunk_obsolete({chunk_id}): {e}")

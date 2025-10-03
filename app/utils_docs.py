@@ -95,9 +95,10 @@ def custom_sidebar_nav(active: str | None = None):
     """
     PAGE_MAP = {
         "Accueil": "streamlit_app.py",
-        "Consultation RAG": "pages/1_consultation_RAG.py",
-        "Chargement & Indexation": "pages/2_chargement_Documents.py",
-        "Utilitaire documentaire": "pages/3_utilitaire_documentaire.py",
+        "🔍 Consultation RAG": "pages/1_consultation_RAG.py",
+        "📁 Chargement & Indexation": "pages/2_chargement_Documents.py",
+        "📊 Analyse utilisateurs": "pages/3_analyse_utilisateurs.py",
+        "📄 Utilitaire documentaire": "pages/4_utilitaire_documentaire.py"   
     }
     labels = list(PAGE_MAP.keys())
     default_index = labels.index(active) if active in labels else 0

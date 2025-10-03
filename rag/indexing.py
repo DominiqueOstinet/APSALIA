@@ -40,16 +40,31 @@ def _enrich_chunks_with_source_metadata(chunks, file_path: Path, stored_path: Pa
     - source_basename : nom du fichier d'origine
     - source_sha256   : hash du fichier d'origine (anti-duplication/version)
     - source_relpath  : chemin relatif (depuis /) du fichier copié dans SOURCE_STORE_DIR
+    - content_sha256  : hash du CONTENU du chunk (pour repérer les doublons/évolutions)
+    - obsolete        : drapeau métier (False par défaut)
     """
+    import hashlib
+
     rel_from_root = os.path.relpath(str(stored_path), start="/")
     basename = file_path.name
     for doc in chunks:
         if not hasattr(doc, "metadata") or doc.metadata is None:
             doc.metadata = {}
+
+        # hash du contenu du chunk (chaîne page_content)
+        try:
+            content_sha = hashlib.sha256(
+                (doc.page_content or "").encode("utf-8", errors="ignore")
+            ).hexdigest()
+        except Exception:
+            content_sha = None
+
         doc.metadata.update({
             "source_basename": basename,
             "source_sha256": sha,
             "source_relpath": rel_from_root,
+            "content_sha256": content_sha,
+            "obsolete": False,
         })
 
 

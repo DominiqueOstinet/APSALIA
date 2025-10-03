@@ -14,81 +14,79 @@ KEYWORDS_REPONSE = [
             "comment", "feedback", "details", "réponse", "réponses", "solution", "solutions"
         ]
 
-def detect_columns(all_sheets: Dict[str, pd.DataFrame], filename: str) -> List[Dict]:
+def detect_columns(
+    all_sheets: Dict[str, pd.DataFrame],
+    filename: str,
+    keywords_besoin: List[str] | None = None,
+    keywords_reponse: List[str] | None = None,
+) -> List[Dict]:
     """
-    Détecte automatiquement les colonnes "besoin" et "réponses" dans un fichier Excel.
+    Détecte automatiquement les colonnes 'besoin' et 'réponse' dans un fichier Excel.
+    - all_sheets: dict {nom_onglet: DataFrame SANS header}
+    - filename: uniquement pour logs
+    - keywords_besoin / keywords_reponse: listes optionnelles; sinon utilise les valeurs par défaut ci-dessus.
     """
-    onglets_traites = []
+    kb = [k.lower().strip() for k in (keywords_besoin or KEYWORDS_BESOIN)]
+    kr = [k.lower().strip() for k in (keywords_reponse or KEYWORDS_REPONSE)]
 
- # Analyser chaque onglet
+    onglets_traites: List[Dict] = []
+
     for sheet_name, df in all_sheets.items():
-        print(f"\n🔍 TRAITEMENT ONGLET: '{sheet_name}'")
-        print(f"   Dimensions: {df.shape}")
-
-
-        # Chercher dans les 20 premières lignes de cet onglet
-        for row_idx in range(min(20, len(df))):
+        # on lit au plus les 20 premières lignes pour repérer l’entête
+        max_rows = min(20, len(df))
+        for row_idx in range(max_rows):
             row = df.iloc[row_idx]
-            print(f"🔍 Analyse ligne {row_idx} → {row.tolist()}") ######### RAJOUTE POUR TEST ################
 
-            # Chercher un mot-clé BESOIN
+            # 1) repérer la colonne BESOIN sur cette ligne
             besoin_col = None
             besoin_content = None
             besoin_keyword = None
 
             for col_idx, cell_value in enumerate(row):
-                if pd.notna(cell_value):
-                    cell_str = str(cell_value).lower()
-
-                    # Chercher dans les mots-clés BESOIN                   
-                    for keyword in KEYWORDS_BESOIN:
-                        if keyword in cell_str:
-                            print(f"   ✅ BESOIN trouvé: '{cell_value}' → '{keyword}' (ligne {row_idx}, col {col_idx})") #### POUR VERIFICATION ###
-                            besoin_col = col_idx
-                            besoin_content = cell_value
-                            besoin_keyword = keyword
-                            break
+                if pd.isna(cell_value):
+                    continue
+                cell_str = str(cell_value).lower()
+                # cherche un mot-clé 'besoin'
+                for kw in kb:
+                    if kw and kw in cell_str:
+                        besoin_col = col_idx
+                        besoin_content = cell_value
+                        besoin_keyword = kw
+                        break
                 if besoin_col is not None:
                     break
 
-            # Si BESOIN trouvé, chercher RÉPONSE(S) sur la même ligne
+            # 2) si BESOIN trouvé, chercher les colonnes RÉPONSE(S) sur la même ligne
             if besoin_col is not None:
-                reponses_trouvees = []
-
+                reponses_trouvees: List[Dict] = []
                 for col_idx, cell_value in enumerate(row):
-                    if col_idx != besoin_col and pd.notna(cell_value):
-                        cell_str = str(cell_value).lower()
+                    if col_idx == besoin_col or pd.isna(cell_value):
+                        continue
+                    cell_str = str(cell_value).lower()
+                    for kw in kr:
+                        if kw and kw in cell_str:
+                            reponses_trouvees.append({
+                                "col": col_idx,
+                                "content": cell_value,
+                                "keyword": kw,
+                            })
+                            break  # cellule suivante
 
-                    # Chercher dans les mots-clés RÉPONSE    
-                        for keyword in KEYWORDS_REPONSE:
-                            if keyword in cell_str:
-                                print(f"      💬 RÉPONSE trouvée: '{cell_value}' → '{keyword}' (col {col_idx})") #### POUR VERIFICATION ###
-                                reponses_trouvees.append({
-                                    'col': col_idx,
-                                    'content': cell_value,
-                                    'keyword': keyword
-                                })
-                                break
-                
-                 # AJOUTER CET ONGLET À LA LISTE TRAITÉE
-                if len(reponses_trouvees) > 0:
-                    #print(f"\n✅ ONGLET '{sheet_name}' TRAITÉ !")
-                    #print(f"   📋 BESOIN: Ligne {row_idx}, Colonne {besoin_col}")
-                    #print(f"   💬 RÉPONSES: {len(reponses_trouvees)} trouvée(s)")
-
+                # 3) si au moins une réponse détectée → on conserve cet onglet
+                if reponses_trouvees:
                     onglets_traites.append({
-                        'onglet': sheet_name,
-                        'ligne_detection': row_idx,
-                        'besoin': {
-                            'colonne': besoin_col,
-                            'contenu': besoin_content,
-                            'mot_cle': besoin_keyword
+                        "onglet": sheet_name,
+                        "ligne_detection": row_idx,
+                        "besoin": {
+                            "colonne": besoin_col,
+                            "contenu": besoin_content,
+                            "mot_cle": besoin_keyword,
                         },
-                        'reponses': reponses_trouvees,
-                        'df': df,
-                        'exploitable': True
+                        "reponses": reponses_trouvees,
+                        "df": df,
+                        "exploitable": True,
                     })
-                    break
+                    break  # onglet traité, on passe au suivant
 
     return onglets_traites
 
